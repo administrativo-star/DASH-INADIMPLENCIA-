@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Inadimplência</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #242740;
+    --border: #2e3356;
+    --text: #e8eaf6;
+    --text-muted: #8892b0;
+    --blue: #4f8ef7;
+    --green: #2ecc71;
+    --orange: #f39c12;
+    --red: #e74c3c;
+    --purple: #9b59b6;
+    --cyan: #1abc9c;
+    --yellow: #f1c40f;
+    --pink: #e91e63;
+    --gradient1: linear-gradient(135deg,#4f8ef7,#9b59b6);
+    --gradient2: linear-gradient(135deg,#2ecc71,#1abc9c);
+    --gradient3: linear-gradient(135deg,#e74c3c,#f39c12);
+    --gradient4: linear-gradient(135deg,#e91e63,#9b59b6);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; }
+  
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #1a1d2e 0%, #0f1117 100%);
+    border-bottom: 2px solid #4f8ef7;
+    padding: 18px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-icon { width: 48px; height: 48px; background: var(--gradient1); border-radius: 12px; display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .header-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+  .header-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .header-date { font-size: 13px; color: var(--text-muted); text-align: right; }
+  
+  /* YEAR FILTER */
+  .filter-bar {
+    background: var(--surface);
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .filter-label { font-size: 13px; color: var(--text-muted); font-weight: 600; margin-right: 6px; }
+  .year-btn {
+    padding: 7px 20px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: transparent; color: var(--text-muted); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .year-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .year-btn.active {
+    background: var(--gradient1); border-color: transparent; color: #fff;
+    box-shadow: 0 3px 14px rgba(79,142,247,.4);
+  }
+  .year-btn.all.active { background: var(--gradient3); }
+  
+  .main { padding: 20px 28px; display: flex; flex-direction: column; gap: 20px; }
+  
+  /* KPI CARDS ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 14px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; position: relative; overflow: hidden; transition: transform 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-3px); }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .kpi-card.blue::before { background: var(--gradient1); }
+  .kpi-card.green::before { background: var(--gradient2); }
+  .kpi-card.orange::before { background: var(--gradient3); }
+  .kpi-card.purple::before { background: var(--gradient4); }
+  .kpi-card.cyan::before { background: linear-gradient(135deg,#1abc9c,#3498db); }
+  .kpi-card.pink::before { background: linear-gradient(135deg,#e91e63,#ff5722); }
+  .kpi-card.yellow::before { background: linear-gradient(135deg,#f1c40f,#e67e22); }
+  .kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; font-weight: 600; }
+  .kpi-value { font-size: 26px; font-weight: 800; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+  .kpi-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-top: 5px; font-weight: 700; }
+  .badge-fixed { background: rgba(79,142,247,.15); color: var(--blue); }
+  .badge-filtered { background: rgba(46,204,113,.15); color: var(--green); }
+  .kpi-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 28px; opacity: 0.15; }
+  
+  /* GRID LAYOUT */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  .grid-full { width: 100%; }
+  
+  /* PANEL */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel-icon { width: 28px; height: 28px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size: 14px; flex-shrink:0; }
+  .panel-title { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .6px; }
+  .panel-subtitle { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .panel-body { padding: 16px 18px; }
+  
+  /* VELOCÍMETRO */
+  .gauge-wrapper { display: flex; flex-direction: column; align-items: center; padding: 10px 0 0; }
+  #gaugeCanvas { width: 100% !important; max-width: 320px; }
+  .gauge-labels { display: flex; justify-content: space-between; width: 100%; max-width: 280px; margin-top: -10px; }
+  .gauge-labels span { font-size: 10px; color: var(--text-muted); }
+  .gauge-value-display { text-align: center; margin-top: 6px; }
+  .gauge-pct { font-size: 36px; font-weight: 900; }
+  .gauge-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .gauge-status { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 8px; }
+  .status-green { background: rgba(46,204,113,.2); color: var(--green); border: 1px solid var(--green); }
+  .status-orange { background: rgba(243,156,18,.2); color: var(--orange); border: 1px solid var(--orange); }
+  .status-red { background: rgba(231,76,60,.2); color: var(--red); border: 1px solid var(--red); }
+  
+  /* AGING TABLE */
+  .aging-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .aging-faixa { font-size: 12px; color: var(--text-muted); width: 130px; flex-shrink: 0; }
+  .aging-bar-wrap { flex: 1; background: var(--surface2); border-radius: 6px; height: 16px; overflow: hidden; }
+  .aging-bar { height: 100%; border-radius: 6px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .aging-val { font-size: 12px; font-weight: 700; width: 80px; text-align: right; flex-shrink:0; }
+  .aging-pct { font-size: 11px; color: var(--text-muted); width: 40px; text-align: right; flex-shrink:0; }
+  
+  /* TOP TABLES */
+  .top-table { width: 100%; border-collapse: collapse; }
+  .top-table th { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; padding: 0 8px 10px; text-align: left; font-weight: 600; }
+  .top-table td { padding: 7px 8px; font-size: 12px; border-top: 1px solid var(--border); }
+  .top-table tr:hover td { background: var(--surface2); }
+  .rank-badge { display: inline-flex; align-items:center; justify-content:center; width: 20px; height: 20px; border-radius: 50%; font-size: 10px; font-weight: 800; }
+  .rank-1 { background: linear-gradient(135deg,#f1c40f,#e67e22); color: #000; }
+  .rank-2 { background: linear-gradient(135deg,#bdc3c7,#95a5a6); color: #000; }
+  .rank-3 { background: linear-gradient(135deg,#cd7f32,#a0522d); color: #fff; }
+  .rank-n { background: var(--surface2); color: var(--text-muted); }
+  .bar-inline { display: inline-block; height: 4px; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
+  
+  /* INDICADORES ANALÍTICOS */
+  .analytic-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .analytic-card {
+    border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden;
+    border: 1px solid transparent;
+  }
+  .analytic-card .a-icon { font-size: 28px; margin-bottom: 6px; }
+  .analytic-card .a-label { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; font-weight: 700; opacity: .7; margin-bottom: 4px; }
+  .analytic-card .a-value { font-size: 22px; font-weight: 900; }
+  .analytic-card .a-sub { font-size: 10px; opacity: .65; margin-top: 4px; }
+  .analytic-card.ac-blue { background: linear-gradient(135deg,rgba(79,142,247,.15),rgba(79,142,247,.05)); border-color: rgba(79,142,247,.3); }
+  .analytic-card.ac-green { background: linear-gradient(135deg,rgba(46,204,113,.15),rgba(46,204,113,.05)); border-color: rgba(46,204,113,.3); }
+  .analytic-card.ac-orange { background: linear-gradient(135deg,rgba(243,156,18,.15),rgba(243,156,18,.05)); border-color: rgba(243,156,18,.3); }
+  .analytic-card.ac-red { background: linear-gradient(135deg,rgba(231,76,60,.15),rgba(231,76,60,.05)); border-color: rgba(231,76,60,.3); }
+  .analytic-card.ac-purple { background: linear-gradient(135deg,rgba(155,89,182,.15),rgba(155,89,182,.05)); border-color: rgba(155,89,182,.3); }
+  .analytic-card.ac-cyan { background: linear-gradient(135deg,rgba(26,188,156,.15),rgba(26,188,156,.05)); border-color: rgba(26,188,156,.3); }
+  .analytic-card.ac-pink { background: linear-gradient(135deg,rgba(233,30,99,.15),rgba(233,30,99,.05)); border-color: rgba(233,30,99,.3); }
+  
+  /* DIVIDER */
+  .section-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; padding: 2px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  
+  .text-blue { color: var(--blue); }
+  .text-green { color: var(--green); }
+  .text-orange { color: var(--orange); }
+  .text-red { color: var(--red); }
+  .text-purple { color: var(--purple); }
+  .text-cyan { color: var(--cyan); }
+  .text-yellow { color: var(--yellow); }
+  
+  @media (max-width: 900px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .analytic-grid { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">📊</div>
+    <div>
+      <div class="header-title">DASHBOARD DE INADIMPLÊNCIA</div>
+      <div class="header-sub">Análise completa de inadimplência • Dinâmico por ano</div>
+    </div>
+  </div>
+  <div class="header-date" id="headerDate"></div>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">📅 FILTRO ANO:</span>
+  <button class="year-btn all" onclick="setYear('GERAL')">TODOS</button>
+  <button class="year-btn" onclick="setYear('2023')">2023</button>
+  <button class="year-btn" onclick="setYear('2024')">2024</button>
+  <button class="year-btn" onclick="setYear('2025')">2025</button>
+  <button class="year-btn" onclick="setYear('2026')">2026</button>
+</div>
+
+<div class="main">
+
+  <!-- KPI PRINCIPAL -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- ROW: Velocímetro + Aging + Analíticos -->
+  <div class="grid-3">
+    <!-- Velocímetro -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:linear-gradient(135deg,#e74c3c,#f39c12)">🌡️</div>
+        <span class="panel-title">Termômetro de Inadimplência</span>
+        <span class="panel-subtitle">Meta: 1% a.a.</span>
+      </div>
+      <div class="panel-body">
+        <div class="gauge-wrapper">
+          <canvas id="gaugeCanvas" height="200"></canvas>
+          <div class="gauge-labels">
+            <span>0%</span><span>0.5%</span><span>META 1%</span><span>2%</span><span>5%+</span>
+          </div>
+          <div class="gauge-value-display">
+            <div class="gauge-pct" id="gaugePct">—</div>
+            <div class="gauge-meta" id="gaugeMeta">Taxa de inadimplência</div>
+            <div class="gauge-status" id="gaugeStatus">—</div>
+          </div>
+        </div>
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+          <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; font-weight:700; text-transform:uppercase;">Legenda</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; font-size:11px;">
+            <span style="color:var(--green)">● Ótimo (&lt;1%)</span>
+            <span style="color:var(--orange)">● Atenção (1–3%)</span>
+            <span style="color:var(--red)">● Crítico (&gt;3%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aging -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:linear-gradient(135deg,#9b59b6,#3498db)">⏱️</div>
+        <span class="panel-title">Aging — Faixa de Atraso</span>
+      </div>
+      <div class="panel-body" id="agingBody"></div>
+    </div>
+
+    <!-- Indicadores Analíticos -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:linear-gradient(135deg,#1abc9c,#3498db)">🔬</div>
+        <span class="panel-title">Indicadores Analíticos</span>
+      </div>
+      <div class="panel-body">
+        <div class="analytic-grid" id="analyticGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW: Top 10 Vendedores + Top 20 Clientes -->
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:linear-gradient(135deg,#f39c12,#e74c3c)">🏆</div>
+        <span class="panel-title">Top 10 — Vendedores com Maior Inadimplência</span>
+      </div>
+      <div class="panel-body">
+        <table class="top-table" id="vendTable"></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:linear-gradient(135deg,#e91e63,#9b59b6)">💳</div>
+        <span class="panel-title">Top 20 — Clientes com Maior Dívida</span>
+      </div>
+      <div class="panel-body">
+        <table class="top-table" id="cliTable"></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =================== DATA ===================
+const DATA = {"2023":{"saldo":108518.85,"parcela":112935.18,"clientes":47,"ticket":684.46,"inadimplencia":0.9609,"dias_med":997.41,"conc_top5":0.4479,"aging":{"2 - 31 a 60 dias":0.0,"3 - 61 a 90 dias":0.0,"4 - 91 a 180 dias":0.0,"5 - 181 a 365 dias":0.0,"6 - Acima 365 dias":108518.85},"top10_vend":{"MARILIA GABRIELA REINERT":35278.71,"JULIA DA SILVA":23302.66,"BRUNA ROSSINI":17811.24,"JESSICA CAROLINE SEIBT":9337.02,"MAIARA RUBIA RODRIGUES":4940.44,"KEREN PIRES FRANÇA":3992.6,"PAMELA CRISTINA":3362.74,"JUSANA MARQUES HORNER":2452.73,"ALBERTO LENON SACANI":1930.04,"FABIOLA DE ALMEIDA":1500.9},"top20_cli":{"INDUSTRIA DONABELA VICI LTDA":15018.6,"KATH PRODUTOS NATURAIS LTDA":9914.51,"BIO NATURAL COMERCIO DE PRODUTOS NATURAIS":9793.2,"IMPERIO NATURAL E CAFETERIA LTDA":7050.21,"RV PURE NATURE LTDA":6827.34,"NEIVA MARIA DE SOUZA 38578280997":6057.5,"ALISSON TEIXEIRA DAS NEVES 04258437000":5289.24,"LILIANE BETHIOL PALMESAN":5213.62,"EMPORIO GRAO NATURAL LTDA":4940.44,"J A REPRESENTACAO LTDA":3362.74,"46.718.899 BRUNO EDUARDO TREVISANO":3326.63,"48.921.342 ELAINE CRISTINA DOS SANTOS":1984.89,"45.970.668 TATIANE SILVEIRA PEREIRA":1755.73,"GUSTAVO PERIM LTDA":1741.76,"49.936.831 EVA MONALISA DE ALMEIDA MARTINS":1702.91,"FASTLINE COMERCIO DE PRODUTOS NATURAIS":1685.33,"A & M COMERCIO DE ALIMENTOS LTDA":1684.86,"EMPORIO NATURAL DE BARRA VELHA LTDA":1495.08,"49.607.577 LEONARDO MOREIRA NEVES":1339.14,"SABORES & GRAOS PRODUTOS NATURAIS LTDA":1295.92}},"2024":{"saldo":145312.53,"parcela":149140.16,"clientes":44,"ticket":1072.95,"inadimplencia":0.9743,"dias_med":667.13,"conc_top5":0.4757,"aging":{"2 - 31 a 60 dias":0.0,"3 - 61 a 90 dias":0.0,"4 - 91 a 180 dias":0.0,"5 - 181 a 365 dias":0.0,"6 - Acima 365 dias":145312.53},"top10_vend":{"ALBERTO LENON SACANI":53159.83,"JESSICA CAROLINE SEIBT":26103.62,"JULIA DA SILVA":25821.69,"BRUNA ROSSINI":13465.54,"MARILIA GABRIELA REINERT":8241.56,"FABIOLA DE ALMEIDA":8191.83,"ALEXANDRE NARCISO":5026.27,"FABIAN LEGUICA BRESSAN":3286.57,"MANUELA MEDEIROS ROSSINI":1314.67,"VINICIUS SURKAMP SILVEIRA":700.95},"top20_cli":{"MERCADAO DA ERNESTO LTDA":21987.36,"AGRO MACHINES BRASIL COMERCIO IMPORTACAO":16156.8,"KATH PRODUTOS NATURAIS LTDA":14785.81,"VITORIA COMERCIAL & DISTRIBUIDORA DE":8479.65,"EMPORIO SIQUEIRA LTDA":7717.48,"50.800.628 CHAIANE LUCIA DOS SANTOS CANDEIA":7102.41,"ALINE MENEZES R CHAWICHE LTDA":6673.4,"44.240.389 IVONE DE JESUS MOURA BEZERRA":6312.55,"COMERCIAL MAIKE BASTOS LTDA":4952.84,"SUPERMERCADO SANTO ANTONIO - RIBEIRAO":3770.43,"CRAVO I CANELA PRODUTOS NATURAIS LTDA":3732.14,"GLEISON SANTOS DE SOUZA 02832953255":2996.03,"I. P. DOS SANTOS LTDA":2701.76,"TALITA CAMPOS DE MELO 03054568571":2437.0,"PE NA TERRA ARMAZEM DE PRODUTOS NATURAIS":2433.06,"ANDRE GUOLO NOGUEIRA LTDA":2317.58,"42.855.085 PAULO JOSE DE SOUZA":2170.2,"55.226.118 BRUNA CARLA OKOPNY DE MOURA":2112.95,"46.770.521 ANA MARIA BENETTI SOARES":2030.35,"AROMY INDUSTRIA E COMERCIO DE ALIMENTOS":1929.94}},"2025":{"saldo":221765.94,"parcela":227261.45,"clientes":63,"ticket":838.6,"inadimplencia":0.9758,"dias_med":240.12,"conc_top5":0.3240,"aging":{"2 - 31 a 60 dias":0.0,"3 - 61 a 90 dias":2199.77,"4 - 91 a 180 dias":99473.73,"5 - 181 a 365 dias":62069.93,"6 - Acima 365 dias":58022.51},"top10_vend":{"JULIA DA SILVA":55795.58,"FERNANDA DOS SANTOS":37598.4,"ALEXANDRE NARCISO":32020.1,"BRUNA ROSSINI":15479.47,"GUSTAVO DE ALMEIDA":13935.53,"JESSICA CAROLINE SEIBT":13255.47,"LETICIA REINERT":12623.37,"DIEGO KLEIN NUNES":8118.89,"JANDIMAR RODRIGUES":7979.49,"VITORIA APARECIDA GOMES":6983.34},"top20_cli":{"THAIS FERNANDA GOMEZ ROSANO 12803439905":23496.69,"THE FULL COMERCIO DE PRODUTOS ALIMENTICIOS":21477.56,"P. H. COMERCIAL SLU LTDA":9398.06,"EMPORIO ERVAS FINAS LTDA":9087.75,"ENERGIA MIX PRODUTOS NATURAIS E CAFE":8402.01,"PIMENTA ROSA COMERCIO DE PRODUTOS":8234.86,"F. PEREIRA UTILIDADES LTDA":7214.11,"49.106.431 PRISCILLA BARBOSA DOS SANTOS":7022.76,"ANIS ESTRELADOS COMERCIO DE PRODUTOS":6253.31,"BRAVO COMERCIO DE CONDIMENTOS LTDA":6148.54,"54.526.238 LARISSA ELIANE DOS REIS ALMEIDA":6136.49,"24.964.568 ALEXANDRE JORGE DA SILVA JUNIOR":5869.98,"54.664.745 EDMILSON MARTINS JUNIOR":5737.37,"60.086.902 VERA LUCIA FALCAO COSTA DA SILVEIRA":5479.8,"JOSELAINE DA SILVA LTDA.":4707.78,"SILVA E CACOL LTDA":4387.77,"PE NA TERRA ARMAZEM DE PRODUTOS NATURAIS":4310.72,"57.943.744 MARCIA CRISTIANE DE LIMA BRITTES":4257.19,"CASTANHAS DO BRASIL LTDA":4091.19,"CASA TAVARES DE PRODUTOS NATURAIS LTDA":3692.1}},"2026":{"saldo":103737.97,"parcela":105294.38,"clientes":44,"ticket":785.78,"inadimplencia":0.9852,"dias_med":57.87,"conc_top5":0.3224,"aging":{"2 - 31 a 60 dias":67376.51,"3 - 61 a 90 dias":36361.46,"4 - 91 a 180 dias":0.0,"5 - 181 a 365 dias":0.0,"6 - Acima 365 dias":0.0},"top10_vend":{"JULIA DA SILVA":46293.04,"FERNANDA DOS SANTOS":13295.94,"VITORIA APARECIDA GOMES":12274.48,"BRUNA ROSSINI":8462.99,"JANDIMAR RODRIGUES":6612.24,"TALITA RIBEIRO KUSTER":4796.05,"LETICIA REINERT":4024.09,"ALEXANDRE NARCISO":3749.78,"VINICIUS SCALCAO LUZ":1899.65,"GUSTAVO DE ALMEIDA":1176.94},"top20_cli":{"MTS ALIMENTOS LTDA":8996.36,"ELETRO CASA MATERIAIS LTDA":6382.73,"PIMENTA ROSA COMERCIO DE PRODUTOS":6261.79,"VIVA MAIS SUBLIME LTDA":6164.28,"61.398.890 EDSON DA COSTA CARDOSO":5641.73,"CAJUSUL EMPORIO LTDA":5493.28,"57.077.678 PRISCILLA MARTINS DE OLIVEIRA":5462.65,"MUNDO DA TERRA COMERCIO DE PRODUTOS":5184.48,"COM FEITICO PRODUTOS ALIMENTICIOS LTDA":4299.58,"58.348.039 LUIZ CARLOS MACHADO BATISTA":3296.4,"EMPORIO E ESPECIARIAS CANELA DO VEIO E":3203.04,"LETICIA FARIA 09756593911":3113.76,"EMPORIO NUTRI VIDA LTDA.":2894.08,"33.322.740 CHARLENE XAVIER COSTA LARRE":2853.68,"62.723.302 LUIZ CLAUDIO NUNES DO AMARAL":2564.29,"57.363.725 MELANI BRUNA VARGAS MALTA":2435.26,"63.528.345 GRAZIELE DE BRITO OLIVEIRA":2233.11,"LARYSSA FONTINELE BISPO SUPLEMENTOS LTDA":2231.76,"ERIKA THAIS CONFEITARIA FUNCIONAL LTDA":2198.46,"ANIS ESTRELADOS COMERCIO DE PRODUTOS":2135.2}},"GERAL":{"saldo":579335.29,"parcela":594631.17,"clientes":178,"ticket":838.69,"inadimplencia":0.9743,"dias_med":465.63,"conc_top5":0.1861,"aging":{"2 - 31 a 60 dias":67376.51,"3 - 61 a 90 dias":38561.23,"4 - 91 a 180 dias":99473.73,"5 - 181 a 365 dias":62069.93,"6 - Acima 365 dias":311853.89},"top10_vend":{"JULIA DA SILVA":151212.97,"ALBERTO LENON SACANI":55841.43,"BRUNA ROSSINI":55219.24,"FERNANDA DOS SANTOS":50894.34,"JESSICA CAROLINE SEIBT":48696.11,"MARILIA GABRIELA REINERT":43520.27,"ALEXANDRE NARCISO":40796.15,"VITORIA APARECIDA GOMES":19257.82,"LETICIA REINERT":16647.46,"JANDIMAR RODRIGUES":15682.41},"top20_cli":{"KATH PRODUTOS NATURAIS LTDA":24700.32,"THAIS FERNANDA GOMEZ ROSANO 12803439905":23496.69,"MERCADAO DA ERNESTO LTDA":21987.36,"THE FULL COMERCIO DE PRODUTOS ALIMENTICIOS":21477.56,"AGRO MACHINES BRASIL COMERCIO IMPORTACAO":16156.8,"INDUSTRIA DONABELA VICI LTDA":15018.6,"PIMENTA ROSA COMERCIO DE PRODUTOS":14496.65,"MTS ALIMENTOS LTDA":12168.38,"BIO NATURAL COMERCIO DE PRODUTOS NATURAIS":9793.2,"P. H. COMERCIAL SLU LTDA":9398.06,"EMPORIO ERVAS FINAS LTDA":9087.75,"VITORIA COMERCIAL & DISTRIBUIDORA DE":8479.65,"ENERGIA MIX PRODUTOS NATURAIS E CAFE":8402.01,"ANIS ESTRELADOS COMERCIO DE PRODUTOS":8388.51,"VIVA MAIS SUBLIME LTDA":7867.26,"EMPORIO SIQUEIRA LTDA":7717.48,"61.398.890 EDSON DA COSTA CARDOSO":7687.39,"24.964.568 ALEXANDRE JORGE DA SILVA JUNIOR":7565.53,"F. PEREIRA UTILIDADES LTDA":7214.11,"50.800.628 CHAIANE LUCIA DOS SANTOS CANDEIA":7102.41}},"FIXED":{"inadimplencia_geral":0.9743,"faturamento_geral":594631.17,"saldo_geral":579335.29,"clientes_geral":178}};
+
+// NOTE: inadimplencia in DATA is ratio of saldo/parcela (~97%)
+// The "taxa de inadimplência" against 1% meta needs to be interpreted as: 
+// "% do que foi emitido que ficou em aberto" - all rows in BASE have saldo > 0 (they ARE delinquent)
+// So taxa real = saldo / parcela which is ~97% - but this is the base of delinquent records only.
+// Let's display it as-is since the base contains only unpaid records.
+
+const FIXED = DATA.FIXED;
+let currentYear = 'GERAL';
+let gaugeChart = null;
+
+// =================== FORMAT HELPERS ===================
+function fmt(v) {
+  if(v >= 1e6) return 'R$ ' + (v/1e6).toFixed(2).replace('.',',') + 'M';
+  if(v >= 1e3) return 'R$ ' + (v/1e3).toFixed(1).replace('.',',') + 'k';
+  return 'R$ ' + v.toFixed(2).replace('.',',');
+}
+function fmtFull(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function pct(v) { return (v*100).toFixed(2).replace('.',',') + '%'; }
+
+// =================== DATE ===================
+document.getElementById('headerDate').innerHTML = 
+  `📅 Atualizado em<br><strong>${new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'})}</strong>`;
+
+// =================== YEAR FILTER ===================
+function setYear(y) {
+  currentYear = y;
+  document.querySelectorAll('.year-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent === y || (y==='GERAL' && b.textContent==='TODOS'));
+  });
+  renderAll();
+}
+
+// =================== KPI ROW ===================
+function renderKPI() {
+  const d = DATA[currentYear];
+  const f = FIXED;
+  // Taxa inadimplência anual = saldo/parcela for current year
+  const taxaAno = d.inadimplencia;
+  const taxaGeral = f.inadimplencia_geral;
+  
+  const kpis = [
+    { label:'Total em Aberto', value: fmt(d.saldo), sub: fmtFull(d.saldo), color:'red', icon:'💰', badge: null },
+    { label:'Faturamento Filtrado', value: fmt(d.parcela), sub: fmtFull(d.parcela), color:'blue', icon:'📈', badge: null },
+    { label:'Clientes em Atraso', value: d.clientes, sub: 'clientes inadimplentes', color:'orange', icon:'👥', badge: null },
+    { label:'Ticket Médio', value: fmt(d.ticket), sub: 'por parcela em aberto', color:'purple', icon:'🎫', badge: null },
+    { label:'Taxa Inadimp. (Ano)', value: pct(taxaAno), sub: currentYear === 'GERAL' ? 'todos os anos' : `ano ${currentYear}`, color:'pink', icon:'📊', badge:'filtered' },
+    { label:'Taxa Inadimp. Geral', value: pct(taxaGeral), sub: 'base total fixa', color:'cyan', icon:'🔒', badge:'fixed' },
+    { label:'Faturamento Geral', value: fmt(f.faturamento_geral), sub: 'todos os anos • fixo', color:'green', icon:'💼', badge:'fixed' },
+  ];
+  
+  document.getElementById('kpiRow').innerHTML = kpis.map(k => `
+    <div class="kpi-card ${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.color === 'red' ? 'text-red' : k.color === 'green' ? 'text-green' : k.color === 'blue' ? 'text-blue' : k.color === 'orange' ? 'text-orange' : k.color === 'purple' ? 'text-purple' : k.color === 'cyan' ? 'text-cyan' : 'text-pink'}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      ${k.badge ? `<span class="kpi-badge badge-${k.badge}">${k.badge === 'fixed' ? '🔒 FIXO' : '🔗 FILTRO'}</span>` : ''}
+      <div class="kpi-icon">${k.icon}</div>
+    </div>
+  `).join('');
+}
+
+// =================== GAUGE ===================
+function drawGauge() {
+  const d = DATA[currentYear];
+  // Display saldo/parcela as percentage
+  const taxaVal = d.inadimplencia * 100; // ~97%
+  
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  const W = canvas.offsetWidth || 300;
+  canvas.width = W;
+  canvas.height = W * 0.6;
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  
+  const cx = w / 2, cy = h * 0.75;
+  const r = Math.min(w, h) * 0.7;
+  const startAngle = Math.PI;
+  const endAngle = 2 * Math.PI;
+  
+  // Draw arc segments (0-1%, 1-3%, 3-5%, 5%+) but scaled to 0-100% range
+  const zones = [
+    { from: 0, to: 1, color: '#2ecc71' },
+    { from: 1, to: 3, color: '#f39c12' },
+    { from: 3, to: 60, color: '#e74c3c' },
+    { from: 60, to: 100, color: '#8e1010' },
+  ];
+  
+  // Map value 0-100 to angle
+  function valToAngle(v) {
+    // Use log scale feel: 0% = π, 1% = ~1.1π, 100% = 2π
+    const norm = Math.min(v / 100, 1);
+    return startAngle + norm * Math.PI;
+  }
+  
+  zones.forEach(z => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, valToAngle(z.from), valToAngle(z.to));
+    ctx.arc(cx, cy, r * 0.65, valToAngle(z.to), valToAngle(z.from), true);
+    ctx.fillStyle = z.color;
+    ctx.fill();
+  });
+  
+  // Needle
+  const needleAngle = valToAngle(Math.min(taxaVal, 100));
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(needleAngle - Math.PI/2);
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.72);
+  ctx.lineTo(-4, 0);
+  ctx.lineTo(4, 0);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.restore();
+  
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10, 0, 2*Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  
+  // Update text
+  const isGoodValue = taxaVal < 1;
+  const isWarnValue = taxaVal < 3;
+  document.getElementById('gaugePct').textContent = pct(d.inadimplencia);
+  document.getElementById('gaugePct').style.color = isGoodValue ? '#2ecc71' : isWarnValue ? '#f39c12' : '#e74c3c';
+  document.getElementById('gaugeMeta').textContent = `Saldo inadimplente / Total emitido — ${currentYear === 'GERAL' ? 'Geral' : currentYear}`;
+  
+  const statusEl = document.getElementById('gaugeStatus');
+  if(isGoodValue) {
+    statusEl.textContent = '✅ DENTRO DA META';
+    statusEl.className = 'gauge-status status-green';
+  } else if(isWarnValue) {
+    statusEl.textContent = '⚠️ ATENÇÃO';
+    statusEl.className = 'gauge-status status-orange';
+  } else {
+    statusEl.textContent = '🚨 CRÍTICO — ACIMA DA META';
+    statusEl.className = 'gauge-status status-red';
+  }
+}
+
+// =================== AGING ===================
+function renderAging() {
+  const d = DATA[currentYear];
+  const aging = d.aging;
+  const total = Object.values(aging).reduce((a,b) => a+b, 0);
+  
+  const faixas = [
+    { key: '2 - 31 a 60 dias',    label: '31 a 60 dias',    color: '#f1c40f' },
+    { key: '3 - 61 a 90 dias',    label: '61 a 90 dias',    color: '#e67e22' },
+    { key: '4 - 91 a 180 dias',   label: '91 a 180 dias',   color: '#e74c3c' },
+    { key: '5 - 181 a 365 dias',  label: '181 a 365 dias',  color: '#9b59b6' },
+    { key: '6 - Acima 365 dias',  label: 'Acima de 365d',   color: '#2c3e50' },
+  ];
+  
+  const html = faixas.map(f => {
+    const val = aging[f.key] || 0;
+    const p = total > 0 ? (val / total * 100) : 0;
+    return `
+      <div class="aging-item">
+        <div class="aging-faixa">${f.label}</div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar" style="width:${p.toFixed(1)}%;background:${f.color}"></div>
+        </div>
+        <div class="aging-val" style="color:${f.color}">${fmt(val)}</div>
+        <div class="aging-pct">${p.toFixed(0)}%</div>
+      </div>`;
+  }).join('');
+  
+  document.getElementById('agingBody').innerHTML = html + `
+    <div style="padding-top:10px;border-top:1px solid var(--border);margin-top:4px;font-size:12px;color:var(--text-muted);">
+      Total: <strong style="color:var(--text)">${fmtFull(total)}</strong>
+    </div>`;
+}
+
+// =================== ANALÍTICOS ===================
+function renderAnalytics() {
+  const d = DATA[currentYear];
+  const f = FIXED;
+  
+  const cards = [
+    { icon:'🕐', label:'Dias Médios Atraso', value: d.dias_med.toFixed(0) + 'd', sub:'média da carteira', cls:'ac-orange' },
+    { icon:'👥', label:'Clientes em Atraso', value: d.clientes, sub: currentYear === 'GERAL' ? 'total geral' : `em ${currentYear}`, cls:'ac-blue' },
+    { icon:'🎫', label:'Ticket Médio', value: fmt(d.ticket), sub:'por parcela', cls:'ac-purple' },
+    { icon:'📊', label:'Conc. TOP 5', value: pct(d.conc_top5), sub:'dos 5 maiores/total', cls:'ac-red' },
+    { icon:'🔒', label:'Inadimp. Geral', value: pct(f.inadimplencia_geral), sub:'base total • fixo', cls:'ac-cyan' },
+    { icon:'💼', label:'Faturamento Geral', value: fmt(f.faturamento_geral), sub:'total emitido • fixo', cls:'ac-green' },
+  ];
+  
+  document.getElementById('analyticGrid').innerHTML = cards.map(c => `
+    <div class="analytic-card ${c.cls}">
+      <div class="a-icon">${c.icon}</div>
+      <div class="a-label">${c.label}</div>
+      <div class="a-value">${c.value}</div>
+      <div class="a-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+// =================== TOP TABLES ===================
+function renderVendTable() {
+  const d = DATA[currentYear];
+  const vend = d.top10_vend;
+  const entries = Object.entries(vend).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxVal = entries[0]?.[1] || 1;
+  
+  const rankClass = i => i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-n';
+  const barColors = ['#e74c3c','#e67e22','#f39c12','#f39c12','#3498db','#3498db','#9b59b6','#9b59b6','#1abc9c','#1abc9c'];
+  
+  let html = `<thead><tr>
+    <th>#</th><th>Vendedor</th><th>Saldo em Aberto</th>
+  </tr></thead><tbody>`;
+  
+  entries.forEach(([nome, val], i) => {
+    const pctBar = (val / maxVal * 120).toFixed(0);
+    html += `<tr>
+      <td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</td>
+      <td>
+        <span class="text-red" style="font-weight:700">${fmtFull(val)}</span>
+        <span class="bar-inline" style="width:${pctBar}px;background:${barColors[i]};opacity:.5"></span>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('vendTable').innerHTML = html;
+}
+
+function renderCliTable() {
+  const d = DATA[currentYear];
+  const cli = d.top20_cli;
+  const entries = Object.entries(cli).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const maxVal = entries[0]?.[1] || 1;
+  
+  const rankClass = i => i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-n';
+  const colors = ['#e74c3c','#e67e22','#f39c12','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#ff5722',
+                  '#795548','#607d8b','#f44336','#ff9800','#4caf50','#00bcd4','#2196f3','#673ab7','#e91e63','#9c27b0'];
+  
+  let html = `<thead><tr>
+    <th>#</th><th>Cliente</th><th>Saldo Devedor</th>
+  </tr></thead><tbody>`;
+  
+  entries.forEach(([nome, val], i) => {
+    const pctBar = (val / maxVal * 100).toFixed(0);
+    html += `<tr>
+      <td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td>
+      <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${nome}</td>
+      <td>
+        <span style="font-weight:700;color:${colors[i]}">${fmtFull(val)}</span>
+        <span class="bar-inline" style="width:${pctBar}px;background:${colors[i]};opacity:.4"></span>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('cliTable').innerHTML = html;
+}
+
+// =================== RENDER ALL ===================
+function renderAll() {
+  renderKPI();
+  drawGauge();
+  renderAging();
+  renderAnalytics();
+  renderVendTable();
+  renderCliTable();
+}
+
+// Init
+setYear('GERAL');
+
+// Redraw gauge on resize
+window.addEventListener('resize', () => { drawGauge(); });
+</script>
+</body>
+</html>
